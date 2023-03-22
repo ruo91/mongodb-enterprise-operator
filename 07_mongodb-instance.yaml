@@ -1,0 +1,204 @@
+apiVersion: mongodb.com/v1
+kind: MongoDB
+metadata:
+  name: mongodb-project
+  namespace: mongo-test
+spec:
+  version: 5.0.14-ent
+  type: ReplicaSet
+  members: 3
+  logLevel: INFO
+  persistent: true
+  exposedExternally: true
+  opsManager:
+    configMapRef:
+      name: mongodb-project
+  credentials: mongodb-project-credentials
+  #shardCount: 3
+  #configServerCount: 3
+  #mongosCount: 3
+  #mongodsPerShardCount: 3
+  agent:
+    #startupOptions:
+    #  maxLogFiles: "30"
+    #  dialTimeoutSeconds: "40"
+    logLevel: INFO
+  statefulSet:
+    spec:
+      serviceName: "mongodb-project"
+  podSpec:
+    podTemplate:
+      spec:
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
+        initContainers:
+        - name: mongodb-enterprise-init-tuned
+          image: 'registry.redhat.io/rhel8/support-tools:latest'
+          securityContext:
+            privileged: true
+          command:
+          - /bin/bash
+          - '-c'
+          - |
+            #### MongoDB Tuned ####
+            # Disable Swap
+            sysctl -w vm.swappiness=0 > /dev/null
+
+            # Disable NUMA(Non-Uniform Memory Access)
+            sysctl -w vm.zone_reclaim_mode=0 > /dev/null
+
+            # Enable Memory Overcommit(Always)
+            sysctl -w vm.overcommit_memory=1 > /dev/null
+
+            # Increase Max Virtual Memory Count
+            # OpenShift Default: 262144
+            # https://github.com/openshift/cluster-node-tuning-operator/blob/release-4.11/assets/tuned/daemon/profiles/openshift/tuned.conf#L26
+            #sysctl -w vm.max_map_count=262144 > /dev/null
+
+            # Increase Maximizing Number of Receive Connections
+            sysctl -w net.core.somaxconn=32768 > /dev/null
+
+            # Decrease Keepalive Times
+            sysctl -w net.ipv4.tcp_keepalive_time=300 > /dev/null
+
+            # Accept Queue Limit, maximum number of established connections
+            sysctl -w net.ipv4.tcp_max_syn_backlog=32768 > /dev/null
+
+            # Disable Transparent Hugepage(THP)
+            echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled > /dev/null
+            echo 'never' > /sys/kernel/mm/transparent_hugepage/defrag > /dev/null
+
+            echo '#### Check MongoDB Tuned ####'
+            echo '# Disable Swap'
+            sysctl vm.swappiness
+            echo
+            echo '# Disable NUMA(Non-Uniform Memory Access)'
+            sysctl vm.zone_reclaim_mode
+            echo
+            echo '# Enable Memory Overcommit(Always)'
+            sysctl vm.overcommit_memory
+            echo
+            echo '# Increase Max Virtual Memory Count'
+            sysctl vm.max_map_count
+            echo
+            echo '# Increase Maximizing Number of Receive Connections'
+            sysctl net.core.somaxconn
+            echo
+            echo '# Decrease Keepalive Times'
+            sysctl net.ipv4.tcp_keepalive_time
+            echo
+            echo '# Accept Queue Limit, maximum number of established connections'
+            sysctl net.ipv4.tcp_max_syn_backlog
+            echo
+            echo '# Disable Transparent Hugepage(THP)'
+            echo 'cat /sys/kernel/mm/transparent_hugepage/enabled'
+            cat /sys/kernel/mm/transparent_hugepage/enabled
+            echo
+            echo 'cat /sys/kernel/mm/transparent_hugepage/defrag'
+            cat /sys/kernel/mm/transparent_hugepage/defrag
+            echo
+            echo 'Done.'
+        - name: mongodb-enterprise-init-database
+          image: 'quay.io/mongodb/mongodb-enterprise-init-database-ubi:1.0.14'
+        containers:
+          - name: mongodb-enterprise-database
+            image: 'quay.io/mongodb/mongodb-enterprise-database-ubi:2.0.2'
+            resources:
+              requests:
+                cpu: '2'
+                memory: 16Gi
+              limits:
+                cpu: '2'
+                memory: 16Gi
+          - name: mongodb-agent
+            image: 'quay.io/mongodb/mongodb-agent-ubi:12.0.15.7646-1'
+            resources:
+              requests:
+                cpu: '2'
+                memory: 4Gi
+              limits:
+                cpu: '2'
+                memory: 4Gi
+          - name: mongodb-agent-monitoring
+            image: 'quay.io/mongodb/mongodb-agent-ubi:12.0.15.7646-1'
+            resources:
+              requests:
+                cpu: '2'
+                memory: 4Gi
+              limits:
+                cpu: '2'
+                memory: 4Gi
+    persistence:
+      multiple:
+        data:
+          storage: 100Gi
+          storageClass: ontap-retain
+        journal:
+          storage: 100Gi
+          storageClass: ontap-retain
+        logs:
+          storage: 100Gi
+          storageClass: ontap-retain
+  mongosPodSpec:
+    persistence:
+      multiple:
+        data:
+          storageClass: ontap-retain
+          storage: 100Gi
+        journal:
+          storageClass: ontap-retain
+          storage: 100Gi
+        logs:
+          storageClass: ontap-retain
+          storage: 100Gi
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.kubernetes.io/worker
+            operator: In
+            values:
+            - ''
+  shardPodSpec:
+    persistence:
+      multiple:
+        data:
+          storage: 100Gi
+          storageClass: ontap-retain
+        journal:
+          storage: 100Gi
+          storageClass: ontap-retain
+        logs:
+          storage: 100Gi
+          storageClass: ontap-retain
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.kubernetes.io/worker
+            operator: In
+            values:
+            - ''
+  configSrvPodSpec:
+    persistence:
+      multiple:
+        data:
+          storage: 100Gi
+          storageClass: ontap-retain
+        journal:
+          storage: 100Gi
+          storageClass: ontap-retain
+        logs:
+          storage: 100Gi
+          storageClass: ontap-retain
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.kubernetes.io/worker
+            operator: In
+            values:
+            - ''
+  backup:
+    autoTerminateOnDeletion: true
+    mode: enabled

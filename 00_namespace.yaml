@@ -1,0 +1,19 @@
+# Create Namespaces
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mongo-test
+  annotations:
+    openshift.io/node-selector: ""
+  labels:
+    openshift.io/cluster-monitoring: "true"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: mongo-test-group
+  namespace: mongo-test
+spec:
+  targetNamespaces:
+    - mongo-test
+  upgradeStrategy: Default

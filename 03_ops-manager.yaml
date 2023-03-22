@@ -1,0 +1,155 @@
+apiVersion: mongodb.com/v1
+kind: MongoDBOpsManager
+metadata:
+  name: ops-manager
+  namespace: mongo-test
+spec:
+  version: 6.0.3
+  replicas: 3
+  adminCredentials: ops-manager-admin
+  externalConnectivity:
+    type: NodePort
+    externalTrafficPolicy: Local
+    #port: 30000
+  configuration:
+    mms.ignoreInitialUiSetup: "true"
+    mms.adminEmailAddr: admin@example.com
+    mms.fromEmailAddr: noreply@example.com
+    mms.replyToEmailAddr: noreply@example.com
+    mms.mail.hostname: smtp-mail.outlook.com
+    mms.mail.port: "587"
+    mms.mail.ssl: "true"
+    mms.mail.transport: smtp
+    mms.minimumTLSVersion: TLSv1.2
+  statefulSet:
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            node-role.kubernetes.io/worker: ""
+          initContainers:
+            - name: mongodb-enterprise-init-ops-manager
+              image: 'quay.io/mongodb/mongodb-enterprise-init-ops-manager-ubi:1.0.10'
+          containers:
+            - name: mongodb-ops-manager
+              image: 'quay.io/mongodb/mongodb-enterprise-ops-manager-ubi:6.0.3'
+              resources:
+                requests:
+                  cpu: '2'
+                  memory: 16Gi
+                limits:
+                  cpu: '2'
+                  memory: 16Gi
+              #volumeMounts:
+              #  - name: snapshot-store
+              #    mountPath: /snapshot_store
+          #volumes:
+          #  - name: snapshot-store
+          #    persistentVolumeClaim:
+          #      claimName: snapshot-store-ops-manager
+          tolerations:
+            - key: "key"
+              operator: "Exists"
+              effect: "NoSchedule"
+  applicationDatabase:
+    type: ReplicaSet
+    members: 3
+    logLevel: INFO
+    version: 5.0.14-ent
+    podSpec:
+      cpu: '2'
+      memory: 16Gi
+      podTemplate:
+        spec:
+          nodeSelector:
+            node-role.kubernetes.io/worker: ""
+          initContainers:
+            - name: mongodb-enterprise-init-appdb
+              image: 'quay.io/mongodb/mongodb-enterprise-init-appdb-ubi:1.0.14'
+          containers:
+            - name: mongod
+              image: 'quay.io/mongodb/mongodb-enterprise-appdb-database-ubi:5.0.14-ent'
+              resources:
+                requests:
+                  cpu: '2'
+                  memory: 16Gi
+                limits:
+                  cpu: '2'
+                  memory: 16Gi
+            - name: mongodb-agent
+              image: 'quay.io/mongodb/mongodb-agent-ubi:12.0.15.7646-1'
+              resources:
+                requests:
+                  cpu: '2'
+                  memory: 4Gi
+                limits:
+                  cpu: '2'
+                  memory: 4Gi
+            - name: mongodb-agent-monitoring
+              image: 'quay.io/mongodb/mongodb-agent-ubi:12.0.15.7646-1'
+              resources:
+                requests:
+                  cpu: '2'
+                  memory: 4Gi
+                limits:
+                  cpu: '2'
+                  memory: 4Gi
+      persistence:
+        multiple:
+          data:
+            storage: 100Gi
+            storageClass: ontap-retain
+          journal:
+            storage: 100Gi
+            storageClass: ontap-retain
+          logs:
+            storage: 100Gi
+            storageClass: ontap-retain
+    agent:
+      #startupOptions:
+      #  serverSelectionTimeoutSeconds: '20'
+      logLevel: INFO
+  backup:
+    headDB:
+      storage: 100Gi
+      storageClass: ontap-retain
+    externalServiceEnabled: true
+    members: 3
+    enabled: true
+    # Configures the list of Blockstore Configs
+    #blockStores:
+    #  - name: blockStore1
+    #    # reference to MongoDB Custom Resource. The Operator watches changes in it and updates Blockstore configuration
+    #    # in Ops Manager
+    #    mongodbResourceRef:
+    #      name: mongodb-project
+    statefulSet:
+      spec:
+        template:
+          spec:
+            nodeSelector:
+              node-role.kubernetes.io/worker: ""
+            initContainers:
+            - name: mongodb-enterprise-init-ops-manager
+              image: 'quay.io/mongodb/mongodb-enterprise-init-ops-manager-ubi:1.0.10'
+            containers:
+              - name: mongodb-backup-daemon
+                image: 'quay.io/mongodb/mongodb-enterprise-ops-manager-ubi:6.0.3'
+                resources:
+                  requests:
+                    cpu: '2'
+                    memory: 16Gi
+                  limits:
+                    cpu: '2'
+                    memory: 16Gi
+                #volumeMounts:
+                #  - name: snapshot-store
+                #    mountPath: /snapshot_store
+            #volumes:
+            #  - name: snapshot-store
+            #    persistentVolumeClaim:
+            #      claimName: snapshot-store-ops-manager
+            tolerations:
+              - key: "key"
+                operator: "Exists"
+                effect: "NoSchedule"

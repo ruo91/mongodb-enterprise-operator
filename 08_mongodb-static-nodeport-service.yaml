@@ -1,0 +1,18 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: mongodb-project-static-nodeport
+  namespace: mongo-test
+  labels:
+    app: mongodb-project
+spec:
+  selector:
+    app: mongodb-project
+  externalTrafficPolicy: Local
+  sessionAffinity: ClientIP
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+      nodePort: 32717

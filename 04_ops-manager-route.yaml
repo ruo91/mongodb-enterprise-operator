@@ -1,0 +1,14 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: ops-manager
+  namespace: mongo-test
+spec:
+  host: ops-manager-mongodb.apps.ocp4.local
+  to:
+    kind: Service
+    name: ops-manager-svc-ext
+    weight: 100
+  port:
+    targetPort: 8080
+  wildcardPolicy: None
